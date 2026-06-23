@@ -3,8 +3,9 @@ package main
 import (
 	"log"
 
+	"github.com/Night-Swan/memex/internal/api"
 	"github.com/Night-Swan/memex/internal/db"
-	"github.com/Night-Swan/memex/internal/embed"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -13,9 +14,12 @@ func main() {
 	}
 	log.Println("connected to database successfully")
 
-	vec, err := embed.GenerateEmbedding("test")
-	if err != nil {
-		log.Fatalf("embedding failed: %v", err)
+	handler := api.NewHandler()
+
+	router := gin.Default()
+	router.POST("/notes", handler.CreateNote)
+
+	if err := router.Run(":8080"); err != nil {
+		log.Fatalf("server failed: %v", err)
 	}
-	log.Printf("got embedding with %d dimensions", len(vec))
 }
