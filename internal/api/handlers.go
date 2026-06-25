@@ -55,3 +55,46 @@ func (h *Handler) CreateNote(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"id": docID})
 }
+
+func (h *Handler) SearchNotes(c *gin.Context) {
+	var query struct {
+		Query string `json:"query" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&query); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	vec, err := embed.GenerateEmbedding(query.Query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	rows, err := db.Pool.Query(c.Request.Context(),
+		`SELECT content, embedding <=> $1 AS distance
+		FROM chunks
+		ORDER BY embedding <=> $1
+		LIMIT 5;`, pgvector.NewVector(vec))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	results := []map[string]interface{}{}
+	for rows.Next() {
+		var content string
+		var distance float64
+		if err := rows.Scan(&content, &distance); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		results = append(results, map[string]interface{}{
+			"content":  content,
+			"distance": distance,
+		})
+	}
+
+	c.JSON(http.StatusOK, results)
+}
