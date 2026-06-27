@@ -18,6 +18,16 @@ type Note struct {
 type Handler struct {
 }
 
+type Profile struct {
+	WeightKg      float64 `json:"weight_kg"`
+	HeightCm      float64 `json:"height_cm"`
+	Age           int     `json:"age"`
+	Sex           string  `json:"sex"`
+	ActivityLevel string  `json:"activity_level"`
+	Goals         string  `json:"goals"`
+}
+
+
 func NewHandler() *Handler {
 	return &Handler{}
 }
@@ -97,4 +107,32 @@ func (h *Handler) SearchNotes(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, results)
+}
+
+
+func (h *Handler) SetProfile(c *gin.Context) {
+	var profile Profile
+	if err := c.ShouldBindJSON(&profile); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	_, err := db.Pool.Exec(c.Request.Context(),
+		"DELETE FROM profile;")
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	profileID := uuid.New()
+	_, err = db.Pool.Exec(c.Request.Context(),
+		`INSERT INTO profile (id, weight_kg, height_cm, age, sex, activity_level, goals)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		profileID, profile.WeightKg, profile.HeightCm, profile.Age, profile.Sex, profile.ActivityLevel, profile.Goals)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": profileID})
 }

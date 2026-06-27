@@ -19,6 +19,8 @@ func main() {
 	router := gin.Default()
 	router.POST("/notes", handler.CreateNote)
 	router.POST("/search", handler.SearchNotes)
+	router.POST("/profile", handler.SetProfile)
+	router.POST("/ask", handler.AskQuestion)
 
 	if err := router.Run(":8080"); err != nil {
 		log.Fatalf("server failed: %v", err)
