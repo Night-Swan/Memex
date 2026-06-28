@@ -181,25 +181,30 @@ func (h *Handler) AskQuestion(c *gin.Context) {
 }
 
 func buildPrompt(question string, chunks []string, hasProfile bool, profile Profile) string {
-	prompt := "You are a personal health assistant. Use the following information to answer the question.\n\n"
-
-	weightStr := strconv.FormatFloat(profile.WeightKg, 'f', -1, 64)
-	heightStr := strconv.FormatFloat(profile.HeightCm, 'f', -1, 64)
-	ageStr := strconv.Itoa(profile.Age)
+	prompt := "You are a personal assistant that answers questions using ONLY the information provided below. "
+	prompt += "Do not use any outside knowledge, even if you know more about the topic. "
+	prompt += "If the provided information is insufficient to answer the question, say so explicitly instead of adding information from elsewhere.\n\n"
 
 	if hasProfile {
 		prompt += "User Profile:\n"
-		prompt += "Weight: " + weightStr + " kg\n"
-		prompt += "Height: " + heightStr + " cm\n"
-		prompt += "Age: " + ageStr + "\n"
+		prompt += "Weight: " + strconv.FormatFloat(profile.WeightKg, 'f', -1, 64) + " kg\n"
+		prompt += "Height: " + strconv.FormatFloat(profile.HeightCm, 'f', -1, 64) + " cm\n"
+		prompt += "Age: " + strconv.Itoa(profile.Age) + "\n"
 		prompt += "Sex: " + profile.Sex + "\n\n"
 	}
 
-	prompt += "Relevant Information from reliable sources:\n"
-	for i, chunk := range chunks {
-		prompt += "Chunk " + strconv.Itoa(i+1) + ": " + chunk + "\n"
+	if len(chunks) == 0 {
+		prompt += "Relevant Information: None found.\n\n"
+	} else {
+		prompt += "Relevant Information from the user's own notes:\n"
+		for i, chunk := range chunks {
+			prompt += "Chunk " + strconv.Itoa(i+1) + ": " + chunk + "\n"
+		}
+		prompt += "\n"
 	}
-	prompt += "\nQuestion: " + question
+
+	prompt += "Question: " + question + "\n"
+	prompt += "Answer using ONLY the chunks above. If they don't contain the answer, say: \"I don't have enough information in your notes to answer this.\""
 
 	return prompt
 }
