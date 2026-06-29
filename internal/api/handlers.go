@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"github.com/jackc/pgx/v5"
 	"errors"
+	"github.com/Night-Swan/memex/internal/chunk"
 )
 
 type Note struct {
@@ -39,14 +40,10 @@ func (h *Handler) CreateNote(c *gin.Context) {
 		return
 	}
 
-	vec, err := embed.GenerateEmbedding(note.Content)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
+	chunks := chunk.SplitText(note.Content, 1000, 150)
 
 	docID := uuid.New()
-	_, err = db.Pool.Exec(c.Request.Context(),
+	_, err := db.Pool.Exec(c.Request.Context(),
 		"INSERT INTO documents (id, title, file_path, source_url) VALUES ($1, $2, $3, $4)",
 		docID, note.Title, nil, nil)
 	if err != nil {
@@ -54,13 +51,21 @@ func (h *Handler) CreateNote(c *gin.Context) {
 		return
 	}
 
-	chunkID := uuid.New()
-	_, err = db.Pool.Exec(c.Request.Context(),
-		"INSERT INTO chunks (id, document_id, chunk_index, page_number, content, embedding) VALUES ($1, $2, $3, $4, $5, $6)",
-		chunkID, docID, 0, nil, note.Content, pgvector.NewVector(vec))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	for i, chunkText := range chunks {
+		vec, err := embed.GenerateEmbedding(chunkText)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		chunkID := uuid.New()
+		_, err = db.Pool.Exec(c.Request.Context(),
+			"INSERT INTO chunks (id, document_id, chunk_index, page_number, content, embedding) VALUES ($1, $2, $3, $4, $5, $6)",
+			chunkID, docID, i, nil, chunkText, pgvector.NewVector(vec))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"id": docID})
